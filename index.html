@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Is This Point On The Line?</title>
+	<style>
+		body { font-family: Arial, sans-serif; margin: 0; background: #f9f9f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+		.container { max-width: 600px; margin: auto; background: #fff; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px #0001; text-align: center; }
+		.question { font-size: 1.3em; margin-bottom: 1em; }
+		.input-group { margin-bottom: 1em; display: flex; justify-content: center; align-items: center; }
+		.input-group label { margin-right: 0.5em; }
+		#solution { margin-top: 2em; display: none; }
+		#math { margin-top: 1em; background: #f3f3f3; padding: 1em; border-radius: 8px; display: inline-block; text-align: left; }
+		#canvas-container { text-align: center; margin-top: 1em; }
+	</style>
+	<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+	<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+</head>
+<body>
+	<div class="container">
+		<div class="question">
+			<span>Is this point on the line?</span>
+		</div>
+		<div class="input-group">
+			<label>Point (x, y):</label>
+			<span id="point"></span>
+		</div>
+		<div class="input-group">
+			<label>Line:</label>
+			<span id="line"></span>
+		</div>
+		<button id="showSolution">Show Solution</button>
+		<div id="solution">
+			<div id="canvas-container">
+				<canvas id="grid" width="400" height="400" style="background:#fff; border:1px solid #ccc;"></canvas>
+			</div>
+			<div id="math"></div>
+		</div>
+	</div>
+	<script>
+		// Randomly generate a point and a line
+		function getRandomInt(min, max) {
+			return Math.floor(Math.random() * (max - min + 1)) + min;
+		}
+		// Generate a random line y = mx + b
+		let m = getRandomInt(-3, 3);
+		if (m === 0) m = 1;
+		let b = getRandomInt(-5, 5);
+		// 50% chance the point is on the line
+		let onLine = Math.random() < 0.5;
+		// Restrict x and y to be within -5 to 5 so the point is always visible
+		// and always within the grid corners (-5,-5), (-5,5), (5,-5), (5,5)
+		function getValidPoint(m, b, onLine) {
+			let tries = 0;
+			while (tries < 1000) {
+				let x = getRandomInt(-5, 5);
+				let y;
+				if (onLine) {
+					y = m * x + b;
+				} else {
+					let yOnLine = m * x + b;
+					// Pick an offset so that y is still in bounds and not on the line
+					let offsetChoices = [];
+					for (let offset = 1; offset <= 3; offset++) {
+						if (yOnLine + offset <= 5) offsetChoices.push(offset);
+						if (yOnLine - offset >= -5) offsetChoices.push(-offset);
+					}
+					if (offsetChoices.length === 0) {
+						y = yOnLine; // fallback
+					} else {
+						let offset = offsetChoices[getRandomInt(0, offsetChoices.length - 1)];
+						y = yOnLine + offset;
+					}
+				}
+				// Ensure both x and y are within -5 to 5
+				if (x >= -5 && x <= 5 && y >= -5 && y <= 5) {
+					return {x, y};
+				}
+				tries++;
+			}
+			// fallback
+			return {x: 0, y: b};
+		}
+
+		let pt = getValidPoint(m, b, onLine);
+		var x = pt.x, y = pt.y;
+		document.getElementById('point').textContent = `(${x}, ${y})`;
+		document.getElementById('line').textContent = `y = ${m}x + ${b}`;
+
+		function drawGridAndObjects() {
+			const canvas = document.getElementById('grid');
+			const ctx = canvas.getContext('2d');
+			ctx.clearRect(0, 0, 400, 400);
+			// Draw grid
+			ctx.strokeStyle = '#eee';
+			for (let i = 0; i <= 400; i += 40) {
+				ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 400); ctx.stroke();
+				ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(400, i); ctx.stroke();
+			}
+			// Draw axes
+			ctx.strokeStyle = '#888';
+			ctx.lineWidth = 1;
+			ctx.beginPath(); ctx.moveTo(200, 0); ctx.lineTo(200, 400); ctx.stroke();
+			ctx.beginPath(); ctx.moveTo(0, 200); ctx.lineTo(400, 200); ctx.stroke();
+			// Draw line (blue)
+			ctx.strokeStyle = '#0074D9';
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			let x1 = -5, x2 = 5;
+			let y1 = m * x1 + b;
+			let y2 = m * x2 + b;
+			// Convert to canvas coords
+			function toCanvas(x, y) {
+				return [200 + x * 40, 200 - y * 40];
+			}
+			let [cx1, cy1] = toCanvas(x1, y1);
+			let [cx2, cy2] = toCanvas(x2, y2);
+			ctx.moveTo(cx1, cy1);
+			ctx.lineTo(cx2, cy2);
+			ctx.stroke();
+			// Draw the given point in red
+			ctx.fillStyle = '#FF4136';
+			let [px, py] = toCanvas(x, y);
+			ctx.beginPath();
+			ctx.arc(px, py, 8, 0, 2 * Math.PI);
+			ctx.fill();
+			// Draw a black border around the point for visibility
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = '#222';
+			ctx.beginPath();
+			ctx.arc(px, py, 8, 0, 2 * Math.PI);
+			ctx.stroke();
+		}
+
+		function showMathSolution() {
+			let mathDiv = document.getElementById('math');
+			// Readable, step-by-step math for average users
+			let eq = `y = ${m}x + ${b}`;
+			let pt = `(${x}, ${y})`;
+			let step1 = `Plug~in~x~and~y:~${y} = ${m}(${x}) + ${b}`;
+			let step2 = `${y} = ${m * x} + ${b}`;
+			let step3 = `${y} = ${m * x + b}`;
+			let result = (y === m * x + b)
+				? `\\text{Yes,\ \ the\ \ point\ \ is\ \ on\ \ the\ \ line.}`
+				: `\\text{No,\ \ the\ \ point\ \ is\ \ not\ \ on\ \ the\ \ line.}`;
+			let latex =
+				`\\text{Given the line:}~${eq} \\\\` +
+				`\\text{Given the point:}~${pt} \\\\` +
+				step1 + ' \\\\' +
+				step2 + ' \\\\' +
+				step3 + ' \\\\' +
+				result;
+			katex.render(latex, mathDiv, { displayMode: true });
+		}
+
+		document.getElementById('showSolution').onclick = function() {
+			document.getElementById('solution').style.display = 'block';
+			drawGridAndObjects();
+			showMathSolution();
+		};
+	</script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+</body>
+</html>
